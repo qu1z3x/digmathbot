@@ -1,7 +1,7 @@
 import TelegramBot from "node-telegram-bot-api";
-const TOKEN = "6837482720:AAG3zR3GkAb9JCQI7M69rVGzDAB-55fbfH4";
+import { config } from "./config.js";
 
-const bot = new TelegramBot(TOKEN, { polling: false });
+const bot = new TelegramBot(config.TOKENs[2], { polling: false });
 const qu1z3xId = "923690530";
 
 async function sendDataAboutButton(firstName, userName, chatId, data) {

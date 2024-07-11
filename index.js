@@ -6,12 +6,9 @@ import { sendDataAboutButton } from "./tgterminal.js";
 import { sendDataAboutError } from "./tgterminal.js";
 import { sendDataAboutText } from "./tgterminal.js";
 
-const TOKENs = [
-	"7072188605:AAGRJq0QEasOS3CYVBnjBZdnIzpRDRWoYpI",
-	"7065552948:AAGJUvNrQVU_sBHK4UrTrFz5Dpy4fccdycQ",
-];
+import { config } from "./config.js";
 
-const TOKEN = TOKENs[1]; // 1 - оригинал
+const TOKEN = config.TOKENs[0]; // 1 - оригинал
 const bot = new TelegramBot(TOKEN, { polling: true });
 
 const qu1z3xId = "923690530";
@@ -128,58 +125,61 @@ async function firstMeeting(chatId, numOfStage = 1) {
 				);
 				break;
 			case 3:
-				await bot.editMessageText(
-					`<b>${dataAboutUser.login}, очень приятно! 🤗</b>\n\n<i>Требуестя для идентификации и парных дуэлей в режиме "Аркада" 🔒</i>\n\n<b>Оставь свой номер телефона, используя автозаполнение! 😉</b>`,
-					{
-						parse_mode: "html",
-						chat_id: chatId,
-						message_id: usersData.find((obj) => obj.chatId == chatId)
-							.messageId,
-						disable_web_page_preview: true,
-					}
-				);
+				firstMeeting(chatId, 4);
 
-				await bot
-					.sendMessage(
-						chatId,
-						`Нажми на кнопку <b>"Автозаполнить номер" ⬇️</b>`,
-						{
-							parse_mode: "HTML",
-							disable_web_page_preview: true,
-							reply_markup: {
-								keyboard: [
-									[
-										{
-											text: "Автозаполнить номер",
-											request_contact: true,
-										},
-									],
-								],
-							},
-						}
-					)
-					.then((message) => {
-						dataAboutUser.messageIdOther = message.message_id;
-					});
+				// await bot.editMessageText(
+				// 	`<b>${dataAboutUser.login}, очень приятно! 🤗</b>\n\n<i>Требуестя для идентификации и парных дуэлей в режиме "Аркада" 🔒</i>\n\n<b>Оставь свой номер телефона, используя автозаполнение! 😉</b>`,
+				// 	{
+				// 		parse_mode: "html",
+				// 		chat_id: chatId,
+				// 		message_id: usersData.find((obj) => obj.chatId == chatId)
+				// 			.messageId,
+				// 		disable_web_page_preview: true,
+				// 	}
+				// );
+
+				// await bot
+				// 	.sendMessage(
+				// 		chatId,
+				// 		`Нажми на кнопку <b>"Автозаполнить номер" ⬇️</b>`,
+				// 		{
+				// 			parse_mode: "HTML",
+				// 			disable_web_page_preview: true,
+				// 			reply_markup: {
+				// 				keyboard: [
+				// 					[
+				// 						{
+				// 							text: "Автозаполнить номер",
+				// 							request_contact: true,
+				// 						},
+				// 					],
+				// 				],
+				// 			},
+				// 		}
+				// 	)
+				// 	.then((message) => {
+				// 		dataAboutUser.messageIdOther = message.message_id;
+				// 	});
 				break;
-
 			case 4:
 				let yourTopicsListText = "";
 				for (let i = 0; i < topics.length; i++)
-					if (dataAboutUser.arcadeData.topicsStatus[i])
+					if (dataAboutUser.matchesData.topicsStatus[i].active)
 						yourTopicsListText += `\n- ${topics[i].name}`;
 
 				await bot.editMessageText(
 					`<b>Супер,</b> теперь я могу <b>тебе доверять!</b> 😍\n\n<b>Давай определимся с твоим арифметическим уровнем!</b>${
 						dataAboutUser.schoolClassNum &&
-						!dataAboutUser.arcadeData.topicsStatus.every((obj) => !obj)
-							? `\n\n<b>Темы ${
+						!dataAboutUser.matchesData.topicsStatus.every(
+							(obj) => !obj.active
+						)
+							? `\n<blockquote><b>Темы ${
 									dataAboutUser.schoolClassNum == 12
 										? `выбранные тобой:`
 										: `${dataAboutUser.schoolClassNum}-го класса:`
-							  }</b><i>${yourTopicsListText}</i>`
-							: ``
-					}\n\n<i>(Изменяется в настроках)</i>\n\n<b>Выбери свой класс в школе:</b>`,
+							  }</b><i>${yourTopicsListText}</i></blockquote>`
+							: `\n`
+					}\n<i>(Изменяется в настроках)</i>\n\n<b>Выбери свой класс в школе:</b>`,
 					{
 						parse_mode: "html",
 						chat_id: chatId,
@@ -248,8 +248,8 @@ async function firstMeeting(chatId, numOfStage = 1) {
 									{
 										text:
 											dataAboutUser.schoolClassNum &&
-											!dataAboutUser.arcadeData.topicsStatus.every(
-												(obj) => !obj
+											!dataAboutUser.matchesData.topicsStatus.every(
+												(obj) => !obj.active
 											)
 												? "Применить выбор ✅"
 												: "",
@@ -272,6 +272,7 @@ async function menuHome(chatId) {
 	const dataAboutUser = usersData.find((obj) => obj.chatId == chatId);
 
 	const dateNowHHNN = new Date().getHours() * 100 + new Date().getMinutes();
+	let dataAboutArcade = null;
 
 	if (dateNowHHNN < 1200 && dateNowHHNN >= 600) textToSayHello = "Доброе утро";
 	else if (dateNowHHNN < 1700 && dateNowHHNN >= 1200)
@@ -284,13 +285,27 @@ async function menuHome(chatId) {
 	try {
 		dataAboutUser.userAction = "menuHome";
 
-		dataAboutUser.arcadeData.writeIntervalFrom = false;
-		dataAboutUser.arcadeData.writeIntervalTo = false;
+		dataAboutUser.matchesData.writeIntervalFrom = false;
+		dataAboutUser.matchesData.mathArcade.writeIntervalTo = false;
 
-		dataAboutUser.countOfCorrect = 0;
-		dataAboutUser.countOfAllProblems = 0;
+		if (dataAboutUser.currentMatchId) {
+			dataAboutArcade = dataAboutUser.matchesData.mathArcade.history.find(
+				(obj) => obj.matchId == dataAboutUser.currentMatchId
+			);
 
-		dataAboutUser.comboOfCorrect = 0;
+			dataAboutUser.matchesData.mathArcade.history[
+				dataAboutUser.matchesData.mathArcade.history.indexOf(
+					dataAboutUser.matchesData.mathArcade.history.find(
+						(obj) => obj.countOfAllProblems == 0
+					)
+				)
+			] = [];
+
+			dataAboutUser.matchesData.mathArcade.newRecordAlert = false;
+
+			dataAboutArcade.isOver = true;
+			dataAboutUser.currentMatchId = null;
+		}
 
 		curriculumCreating(chatId);
 
@@ -305,8 +320,18 @@ async function menuHome(chatId) {
 					inline_keyboard: [
 						[
 							{
-								text: "🔥 Аркада 🕐",
+								text: "🔥 Аркада 🕹️",
 								callback_data: "mathArcade0",
+							},
+						],
+						[
+							{
+								text: "Учебник📖",
+								callback_data: "soon",
+							},
+							{
+								text: "Достижения🎖️",
+								callback_data: "soon",
 							},
 						],
 						[{ text: "Настройки ⚙️", callback_data: "settings" }],
@@ -320,26 +345,33 @@ async function menuHome(chatId) {
 	}
 }
 
+function truncateString(text, maxLength) {
+	if (text.length > maxLength) {
+		return text.substring(0, maxLength - 3) + "...";
+	}
+	return text;
+}
+
 async function topicsList(chatId) {
 	const dataAboutUser = usersData.find((obj) => obj.chatId == chatId);
 
 	try {
 		let yourTopicsListText = "";
 		for (let i = 0; i < topics.length; i++)
-			if (dataAboutUser.arcadeData.topicsStatus[i])
+			if (dataAboutUser.matchesData.topicsStatus[i].active)
 				yourTopicsListText += `\n- ${topics[i].name}`;
 
 		await bot.editMessageText(
 			`<b><i>📚 Выбор определнных тем ✏️</i></b>${
 				dataAboutUser.schoolClassNum &&
-				!dataAboutUser.arcadeData.topicsStatus.every((obj) => !obj)
-					? `<b>\n\nТемы ${
+				!dataAboutUser.matchesData.topicsStatus.every((obj) => !obj.active)
+					? `\n\n<b>Учебный класс: ${
 							dataAboutUser.schoolClassNum == 12
-								? `выбранные тобой:`
-								: `${dataAboutUser.schoolClassNum}-го класса:`
-					  }</b><i>${yourTopicsListText}</i>`
-					: ``
-			}\n\n<b>Выбери нужные темы из списка ниже! 😉</b>`,
+								? `Свой ⚙️`
+								: `${dataAboutUser.schoolClassNum}-й`
+					  }</b>\n<blockquote><b>Выбранные темы:</b><i>${yourTopicsListText}</i></blockquote>`
+					: `\n`
+			}\n<b>Выбери нужные темы из списка ниже! 😉</b>`,
 			{
 				parse_mode: "html",
 				chat_id: chatId,
@@ -356,7 +388,7 @@ async function topicsList(chatId) {
 						[
 							{
 								text: `${topics[0].name} ${
-									dataAboutUser.arcadeData.topicsStatus[0]
+									dataAboutUser.matchesData.topicsStatus[0].active
 										? "✅"
 										: "➕"
 								}`,
@@ -364,7 +396,7 @@ async function topicsList(chatId) {
 							},
 							{
 								text: `${topics[1].name} ${
-									dataAboutUser.arcadeData.topicsStatus[1]
+									dataAboutUser.matchesData.topicsStatus[1].active
 										? "✅"
 										: "➕"
 								}`,
@@ -374,7 +406,7 @@ async function topicsList(chatId) {
 						[
 							{
 								text: `${topics[2].name} ${
-									dataAboutUser.arcadeData.topicsStatus[2]
+									dataAboutUser.matchesData.topicsStatus[2].active
 										? "✅"
 										: "➕"
 								}`,
@@ -382,7 +414,7 @@ async function topicsList(chatId) {
 							},
 							{
 								text: `${topics[3].name} ${
-									dataAboutUser.arcadeData.topicsStatus[3]
+									dataAboutUser.matchesData.topicsStatus[3].active
 										? "✅"
 										: "➕"
 								}`,
@@ -392,7 +424,7 @@ async function topicsList(chatId) {
 						[
 							{
 								text: `${topics[4].name} ${
-									dataAboutUser.arcadeData.topicsStatus[4]
+									dataAboutUser.matchesData.topicsStatus[4].active
 										? "✅"
 										: "➕"
 								}`,
@@ -400,7 +432,7 @@ async function topicsList(chatId) {
 							},
 							{
 								text: `${topics[6].name} ${
-									dataAboutUser.arcadeData.topicsStatus[6]
+									dataAboutUser.matchesData.topicsStatus[6].active
 										? "✅"
 										: "➕"
 								}`,
@@ -410,7 +442,7 @@ async function topicsList(chatId) {
 						[
 							{
 								text: `${topics[5].name} ${
-									dataAboutUser.arcadeData.topicsStatus[5]
+									dataAboutUser.matchesData.topicsStatus[5].active
 										? "✅"
 										: "➕"
 								}`,
@@ -419,7 +451,7 @@ async function topicsList(chatId) {
 
 							{
 								text: `${topics[7].name} ${
-									dataAboutUser.arcadeData.topicsStatus[7]
+									dataAboutUser.matchesData.topicsStatus[7].active
 										? "✅"
 										: "➕"
 								}`,
@@ -429,7 +461,7 @@ async function topicsList(chatId) {
 						[
 							{
 								text: `${topics[8].name} ${
-									dataAboutUser.arcadeData.topicsStatus[8]
+									dataAboutUser.matchesData.topicsStatus[8].active
 										? "✅"
 										: "➕"
 								}`,
@@ -477,8 +509,8 @@ async function topicsList(chatId) {
 						],
 						[
 							{
-								text: dataAboutUser.arcadeData.topicsStatus.every(
-									(obj) => !obj
+								text: dataAboutUser.matchesData.topicsStatus.every(
+									(obj) => !obj.active
 								)
 									? "⛔️ Выбери нужные темы ⛔️"
 									: !dataAboutUser.schoolClassNum
@@ -502,8 +534,8 @@ async function topicsList(chatId) {
 
 							{
 								text:
-									dataAboutUser.arcadeData.topicsStatus.every(
-										(obj) => !obj
+									dataAboutUser.matchesData.topicsStatus.every(
+										(obj) => !obj.active
 									) || !dataAboutUser.schoolClassNum
 										? ""
 										: "🔄️",
@@ -511,8 +543,8 @@ async function topicsList(chatId) {
 							},
 							{
 								text:
-									dataAboutUser.arcadeData.topicsStatus.every(
-										(obj) => !obj
+									dataAboutUser.matchesData.topicsStatus.every(
+										(obj) => !obj.active
 									) || !dataAboutUser.schoolClassNum
 										? ""
 										: "Принять ✅",
@@ -543,26 +575,30 @@ async function curriculumCreating(chatId) {
 		switch (dataAboutUser.schoolClassNum) {
 			case 8:
 				for (let i = 0; i < topics.length; i++)
-					if (i <= 3) dataAboutUser.arcadeData.topicsStatus[i] = true;
-					else dataAboutUser.arcadeData.topicsStatus[i] = false;
+					if (i <= 3)
+						dataAboutUser.matchesData.topicsStatus[i].active = true;
+					else dataAboutUser.matchesData.topicsStatus[i].active = false;
 
 				break;
 			case 9:
 				for (let i = 0; i < topics.length; i++)
-					if (i <= 5) dataAboutUser.arcadeData.topicsStatus[i] = true;
-					else dataAboutUser.arcadeData.topicsStatus[i] = false;
+					if (i <= 5)
+						dataAboutUser.matchesData.topicsStatus[i].active = true;
+					else dataAboutUser.matchesData.topicsStatus[i].active = false;
 
 				break;
 			case 10:
 				for (let i = 0; i < topics.length; i++)
-					if (i <= 10) dataAboutUser.arcadeData.topicsStatus[i] = true;
-					else dataAboutUser.arcadeData.topicsStatus[i] = false;
+					if (i <= 10)
+						dataAboutUser.matchesData.topicsStatus[i].active = true;
+					else dataAboutUser.matchesData.topicsStatus[i].active = false;
 
 				break;
 			case 11:
 				for (let i = 0; i < topics.length; i++)
-					if (i <= 10) dataAboutUser.arcadeData.topicsStatus[i] = true;
-					else dataAboutUser.arcadeData.topicsStatus[i] = false;
+					if (i <= 10)
+						dataAboutUser.matchesData.topicsStatus[i].active = true;
+					else dataAboutUser.matchesData.topicsStatus[i].active = false;
 
 				//TODO: ТЕМЫ 11 КЛАССА
 				break;
@@ -577,33 +613,52 @@ function calculate(chatId) {
 	const dataAboutUser = usersData.find((obj) => obj.chatId == chatId);
 
 	try {
-		switch (dataAboutUser.topicNum) {
+		switch (dataAboutUser.matchesData.topicNum) {
 			case 1:
-				return dataAboutUser.number1 + dataAboutUser.number2;
+				return (
+					dataAboutUser.matchesData.number1 +
+					dataAboutUser.matchesData.number2
+				);
 			case 2:
-				return dataAboutUser.number1 - dataAboutUser.number2;
+				return (
+					dataAboutUser.matchesData.number1 -
+					dataAboutUser.matchesData.number2
+				);
 			case 3:
-				return dataAboutUser.number1 * dataAboutUser.number2;
+				return (
+					dataAboutUser.matchesData.number1 *
+					dataAboutUser.matchesData.number2
+				);
 			case 4:
-				return dataAboutUser.number1 / dataAboutUser.number2;
+				return (
+					dataAboutUser.matchesData.number1 /
+					dataAboutUser.matchesData.number2
+				);
 			case 5:
-				return dataAboutUser.number1 * dataAboutUser.number1;
+				return (
+					dataAboutUser.matchesData.number1 *
+					dataAboutUser.matchesData.number1
+				);
 			case 6:
-				return Math.sqrt(dataAboutUser.number1);
+				return Math.sqrt(dataAboutUser.matchesData.number1);
 			case 7:
 				return (
-					dataAboutUser.number1 *
-					dataAboutUser.number1 *
-					dataAboutUser.number1
+					dataAboutUser.matchesData.number1 *
+					dataAboutUser.matchesData.number1 *
+					dataAboutUser.matchesData.number1
 				);
 			case 8:
-				return Math.cbrt(dataAboutUser.number1);
+				return Math.cbrt(dataAboutUser.matchesData.number1);
 			case 9:
-				if (dataAboutUser.number1 == 0 || dataAboutUser.number1 == 1) {
+				if (
+					dataAboutUser.matchesData.number1 == 0 ||
+					dataAboutUser.matchesData.number1 == 1
+				) {
 					return 1;
 				} else {
 					let result = 1;
-					for (let i = 2; i <= dataAboutUser.number1; i++) result *= i;
+					for (let i = 2; i <= dataAboutUser.matchesData.number1; i++)
+						result *= i;
 
 					return result;
 				}
@@ -618,41 +673,137 @@ function calculate(chatId) {
 	}
 }
 
-async function numbersGenerator(chatId) {
+function adjustInterval(chatId, value) {
 	const dataAboutUser = usersData.find((obj) => obj.chatId == chatId);
 
 	try {
-		switch (dataAboutUser.topicNum) {
+		if (Math.abs(value) <= 50) {
+			switch (dataAboutUser.matchesData.topicNum) {
+				case 5:
+					return value / 2;
+				case 6:
+					return Math.pow(value / 2, 2) * Math.sign(value);
+				case 7:
+					return (value / (value / 3)) * Math.sign(value);
+				case 8:
+					return Math.pow(value / 3, 3);
+				case 9:
+					return (value / (value / 4)) * Math.sign(value);
+			}
+		} else if (Math.abs(value) > 50 && Math.abs(value) <= 100) {
+			switch (dataAboutUser.matchesData.topicNum) {
+				case 5:
+					return value / 3;
+				case 6:
+					return Math.pow(value / 3, 2) * Math.sign(value);
+				case 7:
+					return (value / (value / 6)) * Math.sign(value);
+				case 8:
+					return Math.pow(value / 6, 3);
+				case 9:
+					return (value / (value / 5)) * Math.sign(value);
+			}
+		} else if (Math.abs(value) > 100 && Math.abs(value) <= 200) {
+			switch (dataAboutUser.matchesData.topicNum) {
+				case 5:
+					return value / 4;
+				case 6:
+					return Math.pow(value / 4, 2) * Math.sign(value);
+				case 7:
+					return (value / (value / 8)) * Math.sign(value);
+				case 8:
+					return Math.pow(value / 8, 3);
+				case 9:
+					return (value / (value / 6)) * Math.sign(value);
+			}
+		} else if (Math.abs(value) > 200 && Math.abs(value) <= 300) {
+			switch (dataAboutUser.matchesData.topicNum) {
+				case 5:
+					return value / 5;
+				case 6:
+					return Math.pow(value / 5, 2) * Math.sign(value);
+				case 7:
+					return (value / (value / 10)) * Math.sign(value);
+				case 8:
+					return Math.pow(value / 10, 3);
+				case 9:
+					return (value / (value / 7)) * Math.sign(value);
+			}
+		} else if (Math.abs(value) > 300) {
+			switch (dataAboutUser.matchesData.topicNum) {
+				case 5:
+					return value / 6;
+				case 6:
+					return Math.pow(value / 6, 2) * Math.sign(value);
+				case 7:
+					return (value / (value / 11)) * Math.sign(value);
+				case 8:
+					return Math.pow(value / 11, 3);
+				case 9:
+					return (value / (value / 7)) * Math.sign(value);
+			}
+		} else {
+			return value;
+		}
+	} catch (error) {
+		console.log(error);
+		sendDataAboutError(chatId, `${String(error)}`);
+	}
+}
+
+async function numbersGenerator(chatId) {
+	const dataAboutUser = usersData.find((obj) => obj.chatId == chatId);
+	let dataAboutArcade = null;
+
+	if (dataAboutUser.currentMatchId)
+		dataAboutArcade = dataAboutUser.matchesData.mathArcade.history.find(
+			(obj) => obj.matchId == dataAboutUser.currentMatchId
+		);
+	try {
+		let number1 = 0,
+			number2 = 0;
+		let intervalFrom = dataAboutArcade.settings.intervalFrom,
+			intervalTo = dataAboutArcade.settings.intervalTo;
+
+		switch (dataAboutUser.matchesData.topicNum) {
 			case 1:
 			case 2:
 			case 3:
 			case 4:
+				// TODO: ограничение для умножения
 				do {
-					dataAboutUser.number1 =
-						Math.floor(
-							Math.random() *
-								(dataAboutUser.arcadeData.intervalTo -
-									dataAboutUser.arcadeData.intervalFrom +
-									1)
-						) + dataAboutUser.arcadeData.intervalFrom;
+					number1 =
+						Math.floor(Math.random() * (intervalTo - intervalFrom + 1)) +
+						intervalFrom;
 
-					dataAboutUser.number2 =
-						Math.floor(
-							Math.random() *
-								(dataAboutUser.arcadeData.intervalTo -
-									dataAboutUser.arcadeData.intervalFrom +
-									1)
-						) + dataAboutUser.arcadeData.intervalFrom;
+					number2 =
+						Math.floor(Math.random() * (intervalTo - intervalFrom + 1)) +
+						intervalFrom;
 				} while (
-					((dataAboutUser.number1 + dataAboutUser.number2 >=
-						dataAboutUser.arcadeData.intervalTo / 3 ||
-						dataAboutUser.number1 + dataAboutUser.number2 <
-							dataAboutUser.arcadeData.intervalFrom / 3) &&
-						dataAboutUser.topicNum == 3) ||
-					((dataAboutUser.number1 == dataAboutUser.number2 ||
-						dataAboutUser.number1 % dataAboutUser.number2 != 0 ||
-						dataAboutUser.number1 / dataAboutUser.number2 == 0) &&
-						dataAboutUser.topicNum == 4)
+					// Условия для операции умножения
+					(dataAboutUser.matchesData.topicNum == 3 &&
+						Math.abs(number1) + Math.abs(number2) >=
+							Math.abs(intervalTo) / 3 &&
+						Math.abs(intervalTo) >= 100) ||
+					(Math.abs(number1) + Math.abs(number2) >=
+						Math.abs(intervalFrom) / 3 &&
+						Math.abs(intervalFrom) >= 100) ||
+					// Исключение значений 0, 1, -1
+					number1 == 0 ||
+					number1 == 1 ||
+					number1 == -1 ||
+					number2 == 0 ||
+					number2 == 1 ||
+					number2 == -1 ||
+					// Условия для операции деления
+					(dataAboutUser.matchesData.topicNum == 4 &&
+						(number1 == 0 ||
+							number1 == 1 ||
+							number1 == -1 ||
+							number2 == 0 ||
+							number2 == 1 ||
+							number2 == -1 ||
+							number1 % number2 != 0))
 				);
 				break;
 			case 5:
@@ -660,42 +811,38 @@ async function numbersGenerator(chatId) {
 			case 7:
 			case 8:
 			case 9:
+				intervalFrom = Math.floor(
+					await adjustInterval(chatId, intervalFrom)
+				);
+				intervalTo = Math.floor(await adjustInterval(chatId, intervalTo));
+
 				do {
-					dataAboutUser.number1 =
-						Math.floor(
-							Math.random() *
-								(dataAboutUser.arcadeData.intervalTo -
-									dataAboutUser.arcadeData.intervalFrom +
-									1)
-						) + dataAboutUser.arcadeData.intervalFrom;
+					number1 =
+						Math.floor(Math.random() * (intervalTo - intervalFrom + 1)) +
+						intervalFrom;
 				} while (
-					((dataAboutUser.number1 >
-						dataAboutUser.arcadeData.intervalTo / 2 ||
-						dataAboutUser.number1 <
-							dataAboutUser.arcadeData.intervalFrom / 2) &&
-						dataAboutUser.topicNum == 5) ||
-					((!Number.isInteger(Math.sqrt(dataAboutUser.number1)) ||
-						dataAboutUser.number1 <= 0 ||
-						dataAboutUser.number1 == 1) &&
-						dataAboutUser.topicNum == 6) ||
-					((dataAboutUser.number1 >
-						dataAboutUser.arcadeData.intervalTo / 3 ||
-						dataAboutUser.number1 <
-							dataAboutUser.arcadeData.intervalFrom / 3) &&
-						dataAboutUser.topicNum == 7) ||
-					((!Number.isInteger(Math.cbrt(dataAboutUser.number1)) ||
-						dataAboutUser.number1 == 1 ||
-						dataAboutUser.number1 == 0 ||
-						dataAboutUser.number1 == -1) &&
-						dataAboutUser.topicNum == 8) ||
-					((dataAboutUser.number1 == 0 || dataAboutUser.number1 == 1) &&
-						dataAboutUser.topicNum == 9)
+					dataAboutUser.matchesData.number1 == number1 ||
+					((!Number.isInteger(Math.sqrt(number1)) ||
+						number1 <= 0 ||
+						number1 == 1) &&
+						dataAboutUser.matchesData.topicNum == 6) ||
+					((!Number.isInteger(Math.cbrt(number1)) ||
+						number1 == 1 ||
+						number1 == 0 ||
+						number1 == -1) &&
+						dataAboutUser.matchesData.topicNum == 8) ||
+					(number1 <= 1 && dataAboutUser.matchesData.topicNum == 9) ||
+					number1 == 0 ||
+					number1 == 1 ||
+					number1 == -1
 				);
 				break;
 			case 10:
 			case 11:
 				break;
 		}
+		dataAboutUser.matchesData.number1 = number1;
+		dataAboutUser.matchesData.number2 = number2;
 	} catch (error) {
 		console.log(error);
 		sendDataAboutError(chatId, `${String(error)}`);
@@ -706,105 +853,107 @@ async function mathProblemGenerator(chatId, certainTopicNum = null) {
 	const dataAboutUser = usersData.find((obj) => obj.chatId == chatId);
 
 	try {
-		if (certainTopicNum) dataAboutUser.topicNum = certainTopicNum;
+		if (certainTopicNum) dataAboutUser.matchesData.topicNum = certainTopicNum;
 		else
 			do {
-				dataAboutUser.topicNum =
+				dataAboutUser.matchesData.topicNum =
 					Math.floor(Math.random() * topics.length) + 1;
 			} while (
-				!dataAboutUser.arcadeData.topicsStatus[dataAboutUser.topicNum - 1]
+				!dataAboutUser.matchesData.topicsStatus[
+					dataAboutUser.matchesData.topicNum - 1
+				].active
 			);
 
 		await numbersGenerator(chatId);
-		dataAboutUser.result = calculate(chatId);
+		dataAboutUser.matchesData.result = calculate(chatId);
 
-		switch (dataAboutUser.topicNum) {
+		switch (dataAboutUser.matchesData.topicNum) {
 			case 1:
-				dataAboutUser.mathProblemSentence =
+				dataAboutUser.matchesData.mathProblemSentence =
 					`${
-						dataAboutUser.number1 < 0
-							? `(${dataAboutUser.number1})`
-							: dataAboutUser.number1
+						dataAboutUser.matchesData.number1 < 0
+							? `(${dataAboutUser.matchesData.number1})`
+							: dataAboutUser.matchesData.number1
 					}` +
-					` ${topics[dataAboutUser.topicNum - 1].symbol} ` +
+					` ${topics[dataAboutUser.matchesData.topicNum - 1].symbol} ` +
 					`${
-						dataAboutUser.number2 < 0
-							? `(${dataAboutUser.number2})`
-							: dataAboutUser.number2
+						dataAboutUser.matchesData.number2 < 0
+							? `(${dataAboutUser.matchesData.number2})`
+							: dataAboutUser.matchesData.number2
 					}`;
 				break;
 			case 2:
-				dataAboutUser.mathProblemSentence =
+				dataAboutUser.matchesData.mathProblemSentence =
 					`${
-						dataAboutUser.number1 < 0
-							? `(${dataAboutUser.number1})`
-							: dataAboutUser.number1
+						dataAboutUser.matchesData.number1 < 0
+							? `(${dataAboutUser.matchesData.number1})`
+							: dataAboutUser.matchesData.number1
 					}` +
-					` ${topics[dataAboutUser.topicNum - 1].symbol} ` +
+					` ${topics[dataAboutUser.matchesData.topicNum - 1].symbol} ` +
 					`${
-						dataAboutUser.number2 < 0
-							? `(${dataAboutUser.number2})`
-							: dataAboutUser.number2
+						dataAboutUser.matchesData.number2 < 0
+							? `(${dataAboutUser.matchesData.number2})`
+							: dataAboutUser.matchesData.number2
 					}`;
 				break;
 			case 3:
-				dataAboutUser.mathProblemSentence =
+				dataAboutUser.matchesData.mathProblemSentence =
 					`${
-						dataAboutUser.number1 < 0
-							? `(${dataAboutUser.number1})`
-							: dataAboutUser.number1
+						dataAboutUser.matchesData.number1 < 0
+							? `(${dataAboutUser.matchesData.number1})`
+							: dataAboutUser.matchesData.number1
 					}` +
-					` ${topics[dataAboutUser.topicNum - 1].symbol} ` +
+					` ${topics[dataAboutUser.matchesData.topicNum - 1].symbol} ` +
 					`${
-						dataAboutUser.number2 < 0
-							? `(${dataAboutUser.number2})`
-							: dataAboutUser.number2
+						dataAboutUser.matchesData.number2 < 0
+							? `(${dataAboutUser.matchesData.number2})`
+							: dataAboutUser.matchesData.number2
 					}`;
 				break;
 			case 4:
-				dataAboutUser.mathProblemSentence =
+				dataAboutUser.matchesData.mathProblemSentence =
 					`${
-						dataAboutUser.number1 < 0
-							? `(${dataAboutUser.number1})`
-							: dataAboutUser.number1
+						dataAboutUser.matchesData.number1 < 0
+							? `(${dataAboutUser.matchesData.number1})`
+							: dataAboutUser.matchesData.number1
 					}` +
-					` ${topics[dataAboutUser.topicNum - 1].symbol} ` +
+					` ${topics[dataAboutUser.matchesData.topicNum - 1].symbol} ` +
 					`${
-						dataAboutUser.number2 < 0
-							? `(${dataAboutUser.number2})`
-							: dataAboutUser.number2
+						dataAboutUser.matchesData.number2 < 0
+							? `(${dataAboutUser.matchesData.number2})`
+							: dataAboutUser.matchesData.number2
 					}`;
 				break;
 			case 5:
-				dataAboutUser.mathProblemSentence =
+				dataAboutUser.matchesData.mathProblemSentence =
 					`${
-						dataAboutUser.number1 < 0
-							? `(${dataAboutUser.number1})`
-							: dataAboutUser.number1
-					}` + `${topics[dataAboutUser.topicNum - 1].symbol}`;
+						dataAboutUser.matchesData.number1 < 0
+							? `(${dataAboutUser.matchesData.number1})`
+							: dataAboutUser.matchesData.number1
+					}` + `${topics[dataAboutUser.matchesData.topicNum - 1].symbol}`;
 				break;
 			case 6:
-				dataAboutUser.mathProblemSentence =
-					`${topics[dataAboutUser.topicNum - 1].symbol}` +
-					dataAboutUser.number1;
+				dataAboutUser.matchesData.mathProblemSentence =
+					`${topics[dataAboutUser.matchesData.topicNum - 1].symbol}` +
+					dataAboutUser.matchesData.number1;
 				break;
 			case 7:
-				dataAboutUser.mathProblemSentence =
+				dataAboutUser.matchesData.mathProblemSentence =
 					`${
-						dataAboutUser.number1 < 0
-							? `(${dataAboutUser.number1})`
-							: dataAboutUser.number1
-					}` + `${topics[dataAboutUser.topicNum - 1].symbol}`;
+						dataAboutUser.matchesData.number1 < 0
+							? `(${dataAboutUser.matchesData.number1})`
+							: dataAboutUser.matchesData.number1
+					}` + `${topics[dataAboutUser.matchesData.topicNum - 1].symbol}`;
 				break;
 			case 8:
-				dataAboutUser.mathProblemSentence =
-					`${topics[dataAboutUser.topicNum - 1].symbol}` +
-					dataAboutUser.number1;
+				dataAboutUser.matchesData.mathProblemSentence =
+					`${topics[dataAboutUser.matchesData.topicNum - 1].symbol}` +
+					dataAboutUser.matchesData.number1;
 				break;
 			case 9:
-				dataAboutUser.mathProblemSentence =
-					dataAboutUser.number1 +
-					`${topics[dataAboutUser.topicNum - 1].symbol}`;
+				dataAboutUser.matchesData.mathProblemSentence =
+					dataAboutUser.matchesData.number1 +
+					`${topics[dataAboutUser.matchesData.topicNum - 1].symbol}`;
 				break;
 			case 10:
 				break;
@@ -817,22 +966,42 @@ async function mathProblemGenerator(chatId, certainTopicNum = null) {
 	}
 }
 
-async function mathArcade(chatId, numOfStage = 0, generateNew = true) {
+async function mathArcade(
+	chatId,
+	numOfStage = 0,
+	generateNew = true,
+	topicsListActive = false
+) {
 	const dataAboutUser = usersData.find((obj) => obj.chatId == chatId);
+	let dataAboutArcade = null;
 
-	await curriculumCreating(chatId);
+	if (dataAboutUser.currentMatchId)
+		dataAboutArcade = dataAboutUser.matchesData.mathArcade.history.find(
+			(obj) => obj.matchId == dataAboutUser.currentMatchId
+		);
 
 	try {
 		dataAboutUser.userAction = `mathArcade${numOfStage}`;
 
+		await curriculumCreating(chatId);
+
+		let generatorLevel = dataAboutUser.matchesData.generatorLevel;
+
 		switch (numOfStage) {
 			case 0:
-				let generatorLevel = dataAboutUser.arcadeData.generatorLevel;
+				// `if (dataAboutUser.currentMatchId) {
+				// 	dataAboutArcade.countOfCorrect = 0;
+				// 	dataAboutArcade.countOfAllProblems = 0;
+				// 	dataAboutArcade.recordInThisMatch = false;
+
+				// 	dataAboutArcade.isOver = true;
+				// 	dataAboutUser.currentMatchId = null;
+				// }`
 
 				if (generatorLevel != 0) {
-					dataAboutUser.arcadeData.intervalFrom =
+					dataAboutUser.matchesData.intervalFrom =
 						generatorLevel == 1
-							? 0
+							? -25
 							: generatorLevel == 2
 							? -50
 							: generatorLevel == 3
@@ -842,7 +1011,7 @@ async function mathArcade(chatId, numOfStage = 0, generateNew = true) {
 							: generatorLevel == 5
 							? -300
 							: null;
-					dataAboutUser.arcadeData.intervalTo =
+					dataAboutUser.matchesData.intervalTo =
 						generatorLevel == 1
 							? 25
 							: generatorLevel == 2
@@ -856,12 +1025,9 @@ async function mathArcade(chatId, numOfStage = 0, generateNew = true) {
 							: null;
 				}
 
-				dataAboutUser.countOfCorrect = 0;
-				dataAboutUser.countOfAllProblems = 0;
-
 				let yourTopicsListText = "";
 				for (let i = 0; i < topics.length; i++)
-					if (dataAboutUser.arcadeData.topicsStatus[i])
+					if (dataAboutUser.matchesData.topicsStatus[i].active)
 						yourTopicsListText += `\n- ${topics[i].name}`;
 
 				await bot.editMessageText(
@@ -869,29 +1035,32 @@ async function mathArcade(chatId, numOfStage = 0, generateNew = true) {
 						generatorLevel == 0
 							? `Своя ⚙️`
 							: `${generatorLevel >= 4 ? "🔥" : ""}${generatorLevel} ур `
-					}</b>\nЧисла <b>от ${dataAboutUser.arcadeData.intervalFrom} до ${
-						dataAboutUser.arcadeData.intervalTo
-					}${
-						dataAboutUser.arcadeData.intervalFromError ||
-						dataAboutUser.arcadeData.intervalToError
+					}</b>\nЧисла <b>от ${
+						dataAboutUser.matchesData.intervalFrom
+					} до ${dataAboutUser.matchesData.intervalTo}</b>${
+						dataAboutUser.schoolClassNum &&
+						!dataAboutUser.matchesData.topicsStatus.every(
+							(obj) => !obj.active
+						)
+							? topicsListActive
+								? `\n<blockquote><b>Включенные темы:</b><i>${yourTopicsListText}</i>\n<b><a href = "https://t.me/${BotName}/?start=topicsListHideInMathArcade0">Скрыть список</a></b></blockquote>`
+								: `\n<blockquote><b>Включенные темы:</b><i>${truncateString(
+										yourTopicsListText,
+										22
+								  )}</i>\n<b><a href = "https://t.me/${BotName}/?start=topicsListShowInMathArcade0">Раскрыть список</a></b></blockquote>`
+							: ``
+					}<b>${
+						dataAboutUser.matchesData.intervalFromError ||
+						dataAboutUser.matchesData.intervalToError
 							? "\n\n❗Промежуток ОТ должен быть меньше и не равен промежутку ДО ⛔️"
 							: !dataAboutUser.schoolClassNum
 							? "\n\n❗Выбери свой класс ⛔️"
-							: dataAboutUser.arcadeData.topicsStatus.every(
-									(obj) => !obj
+							: dataAboutUser.matchesData.topicsStatus.every(
+									(obj) => !obj.active
 							  )
 							? "\n\n❗У тебя не выбраны темы ⛔️"
-							: ""
-					}</b>${
-						dataAboutUser.schoolClassNum &&
-						!dataAboutUser.arcadeData.topicsStatus.every((obj) => !obj)
-							? `\n\n<b>Включенные темы:</b><i>${yourTopicsListText}</i>\n<b>Темы ${
-									dataAboutUser.schoolClassNum == 12
-										? `выбранные тобой`
-										: `${dataAboutUser.schoolClassNum}-го класса`
-							  }</b>`
-							: ``
-					}\n\n<b>Если требуется, измени параметры, и начинай считать! 😉</b>`,
+							: "\n\nЕсли требуется, измени параметры, и начинай считать! 😉"
+					}</b>`,
 					{
 						parse_mode: "html",
 						chat_id: chatId,
@@ -902,7 +1071,7 @@ async function mathArcade(chatId, numOfStage = 0, generateNew = true) {
 							inline_keyboard: [
 								[
 									{
-										text: `Промежуток генерации чисел`,
+										text: `Уровень генерации чисел`,
 										callback_data: "-",
 									},
 								],
@@ -932,27 +1101,27 @@ async function mathArcade(chatId, numOfStage = 0, generateNew = true) {
 								],
 								[
 									{
-										text: dataAboutUser.arcadeData.writeIntervalFrom
+										text: dataAboutUser.matchesData.writeIntervalFrom
 											? `от ... ❌`
 											: `${
-													dataAboutUser.arcadeData
+													dataAboutUser.matchesData
 														.intervalFromError
 														? "⛔️ "
 														: ""
 											  }от ${
-													dataAboutUser.arcadeData.intervalFrom
+													dataAboutUser.matchesData.intervalFrom
 											  } ✏️`,
 										callback_data: "toggleWriteIntervalFrom",
 									},
 									{
-										text: dataAboutUser.arcadeData.writeIntervalTo
+										text: dataAboutUser.matchesData.writeIntervalTo
 											? `до ... ❌`
 											: `${
-													dataAboutUser.arcadeData.intervalToError
+													dataAboutUser.matchesData.intervalToError
 														? "⛔️ "
 														: ""
 											  }до ${
-													dataAboutUser.arcadeData.intervalTo
+													dataAboutUser.matchesData.intervalTo
 											  } ✏️`,
 										callback_data: "toggleWriteIntervalTo",
 									},
@@ -1010,30 +1179,14 @@ async function mathArcade(chatId, numOfStage = 0, generateNew = true) {
 									},
 								],
 								[
-									{
-										text:
-											dataAboutUser.arcadeData.intervalFromError ||
-											dataAboutUser.arcadeData.intervalToError
-												? "⛔️ Измени промежуток ⛔️"
-												: !dataAboutUser.schoolClassNum
-												? "⛔️ Выбери класс ⛔️"
-												: dataAboutUser.arcadeData.topicsStatus.every(
-														(obj) => !obj
-												  )
-												? "⛔️ Выбери нужные темы ⛔️"
-												: "",
-										callback_data: "-",
-									},
-								],
-								[
 									{ text: "⬅️В меню", callback_data: "exit" },
 									{
 										text:
-											dataAboutUser.arcadeData.intervalFromError ||
-											dataAboutUser.arcadeData.intervalToError ||
+											dataAboutUser.matchesData.intervalFromError ||
+											dataAboutUser.matchesData.intervalToError ||
 											!dataAboutUser.schoolClassNum ||
-											dataAboutUser.arcadeData.topicsStatus.every(
-												(obj) => !obj
+											dataAboutUser.matchesData.topicsStatus.every(
+												(obj) => !obj.active
 											)
 												? ""
 												: "Поехали 🚀",
@@ -1046,39 +1199,147 @@ async function mathArcade(chatId, numOfStage = 0, generateNew = true) {
 				);
 				break;
 			case 1:
+				if (!dataAboutUser.currentMatchId) {
+					do {
+						rndId = Math.floor(Math.random() * 100000);
+					} while (
+						dataAboutUser.matchesData.mathArcade.history.some(
+							(matchData) => matchData.matchId == rndId
+						) &&
+						dataAboutUser.matchesData.mathArcade.history.length != 0
+					);
+
+					console.log("Матч записан в массив");
+
+					await dataAboutUser.matchesData.mathArcade.history.push({
+						matchId: rndId,
+						startTime: new Date(),
+						allTime: 0,
+
+						// СЧЕТЧИКИ
+						comboOfCorrect: 0,
+						comboOfIncorrect: 0,
+						maxComboOfCorrect: 0,
+						countOfCorrect: 0,
+						countOfAllProblems: 0,
+
+						// ИСТОРИЯ ПРИМЕРОВ В ЭТОМ МАТЧЕ
+						mathProblemsHistory: [],
+
+						// ПАРАМЕТРЫ ПРИ СОЗДАНИИ
+						settings: {
+							generatorLevel: dataAboutUser.matchesData.generatorLevel,
+							intervalFrom: dataAboutUser.matchesData.intervalFrom,
+							intervalTo: dataAboutUser.matchesData.intervalTo,
+
+							topicsStatus: dataAboutUser.matchesData.topicsStatus,
+						},
+
+						// СТАТУСЫ
+						recordInThisMatch: false,
+						isOver: false,
+					});
+
+					dataAboutUser.currentMatchId = rndId;
+				}
+
+				if (dataAboutUser.currentMatchId)
+					dataAboutArcade =
+						dataAboutUser.matchesData.mathArcade.history.find(
+							(obj) => obj.matchId == dataAboutUser.currentMatchId
+						);
+
+				generatorLevel = dataAboutArcade.settings.generatorLevel;
+
+				// if (generatorLevel != 0) {
+				// 	dataAboutArcade.settings.intervalFrom =
+				// 		generatorLevel == 1
+				// 			? -25
+				// 			: generatorLevel == 2
+				// 			? -50
+				// 			: generatorLevel == 3
+				// 			? -100
+				// 			: generatorLevel == 4
+				// 			? -200
+				// 			: generatorLevel == 5
+				// 			? -300
+				// 			: null;
+				// 	dataAboutArcade.settings.intervalTo =
+				// 		generatorLevel == 1
+				// 			? 25
+				// 			: generatorLevel == 2
+				// 			? 50
+				// 			: generatorLevel == 3
+				// 			? 100
+				// 			: generatorLevel == 4
+				// 			? 200
+				// 			: generatorLevel == 5
+				// 			? 300
+				// 			: null;
+				// }
+
 				if (generateNew) await mathProblemGenerator(chatId);
 
 				await bot.editMessageText(
-					`<b><i>🔥 Аркада 🕐</i></b>\n\nСложность: <b>${
-						dataAboutUser.arcadeData.generatorLevel == 0
+					`<b><i>🔥 Аркада 🕹️</i></b>\n\nСложность: <b>${
+						dataAboutArcade.settings.generatorLevel == 0
 							? "Своя ⚙️"
-							: `${dataAboutUser.arcadeData.generatorLevel}-я`
-					}</b>\nЧисла <b>от ${dataAboutUser.arcadeData.intervalFrom} до ${
-						dataAboutUser.arcadeData.intervalTo
+							: `${dataAboutArcade.settings.generatorLevel}-я`
+					}</b>\nЧисла <b>от ${dataAboutArcade.settings.intervalFrom} до ${
+						dataAboutArcade.settings.intervalTo
 					}${
-						dataAboutUser.comboOfCorrect != 0
-							? `\n\nКомбо ( ${dataAboutUser.comboOfCorrect}x ) ${
-									dataAboutUser.comboOfCorrect >= 15
-										? "🔥"
-										: dataAboutUser.comboOfCorrect >= 10
-										? "🤯"
-										: dataAboutUser.comboOfCorrect >= 5
-										? "😮"
-										: ""
-							  }${
-									dataAboutUser.comboOfCorrect >= 5 &&
-									dataAboutUser.arcadeData.generatorLevel != 5 &&
-									dataAboutUser.arcadeData.generatorLevel != 0
-										? `\n<a href="https://t.me/${BotName}/?start=setLevel${
-												dataAboutUser.arcadeData.generatorLevel + 1
-										  }InMathArcade1">Начать снова, но посложней</a>`
+						dataAboutUser.matchesData.mathArcade.maxComboOfCorrect != 0
+							? dataAboutUser.matchesData.mathArcade.newRecordAlert
+								? `\n\nНовый рекорд! 🎉`
+								: `</b>\n\nЛучшее комбо: <b>${dataAboutUser.matchesData.mathArcade.maxComboOfCorrect}x 🏆`
+							: dataAboutArcade.comboOfCorrect != 0 &&
+							  dataAboutUser.matchesData.mathArcade.maxComboOfCorrect ==
+									0
+							? `\n`
+							: ``
+					}${
+						dataAboutUser.matchesData.mathArcade.previousMatchIsOverAlert
+							? `</b><i>\n\nЗавершенная аркада сохранена в "Истории", новый уровень: ${dataAboutArcade.settings.generatorLevel}-й</i><b>`
+							: `${
+									dataAboutArcade.comboOfCorrect != 0
+										? `\nПодряд ( ${
+												dataAboutArcade.comboOfCorrect
+										  }x ) ${
+												dataAboutArcade.comboOfCorrect >= 15
+													? "🔥"
+													: dataAboutArcade.comboOfCorrect >= 10
+													? "🤯"
+													: dataAboutArcade.comboOfCorrect >= 5
+													? "😮"
+													: ""
+										  }${
+												dataAboutArcade.comboOfCorrect >= 5 &&
+												dataAboutArcade.settings.generatorLevel !=
+													5 &&
+												dataAboutArcade.settings.generatorLevel != 0
+													? `\n<a href="https://t.me/${BotName}/?start=setLevel${
+															dataAboutArcade.settings
+																.generatorLevel + 1
+													  }InMathArcade1">Начать снова, но посложней</a>`
+													: ``
+										  }`
+										: dataAboutArcade.comboOfIncorrect >= 3 &&
+										  dataAboutArcade.settings.generatorLevel != 1 &&
+										  dataAboutArcade.settings.generatorLevel != 0
+										? `${
+												dataAboutUser.matchesData.mathArcade
+													.maxComboOfCorrect == 0
+													? "\n"
+													: ""
+										  }\n<a href="https://t.me/${BotName}/?start=setLevel${
+												dataAboutArcade.settings.generatorLevel - 1
+										  }InMathArcade1">Начать снова, но полегче</a>`
 										: ``
 							  }`
-							: ``
 					}\n\nРеши пример:<blockquote>${
-						dataAboutUser.mathProblemSentence
+						dataAboutUser.matchesData.mathProblemSentence
 					} = ...  <a href="1">💡</a></blockquote></b><i>Тема: <b>"${
-						topics[dataAboutUser.topicNum - 1].name
+						topics[dataAboutUser.matchesData.topicNum - 1].name
 					}"</b></i>`,
 					{
 						parse_mode: "html",
@@ -1091,24 +1352,17 @@ async function mathArcade(chatId, numOfStage = 0, generateNew = true) {
 								[
 									{
 										text: "❌",
-										callback_data: `${
-											dataAboutUser.comboOfCorrect != 0
-												? `warningExitMathArcadeTo"exit"`
-												: `exit`
-										}`,
+										callback_data: `warningExitMathArcadeTo"mathArcade3"`,
 									},
-									{
-										text: "⚙️",
-										callback_data: `${
-											dataAboutUser.comboOfCorrect != 0
-												? `warningExitMathArcadeTo"mathArcade0"`
-												: `mathArcade0`
-										}`,
-									},
+									// {
+									// 	text: "⚙️",
+									// 	callback_data: `warningExitMathArcadeTo"mathArcade0"
+									// 	`,
+									// },
 									{
 										text: "➡️",
 										callback_data: `${
-											dataAboutUser.comboOfCorrect != 0
+											dataAboutArcade.comboOfCorrect != 0
 												? `warningExitMathArcadeTo"nextMathProblemGeneration"`
 												: "nextMathProblemGeneration"
 										}`,
@@ -1118,52 +1372,114 @@ async function mathArcade(chatId, numOfStage = 0, generateNew = true) {
 						},
 					}
 				);
+
+				dataAboutUser.matchesData.mathArcade.previousMatchIsOverAlert = false;
 				break;
 			case 2:
-				if (dataAboutUser.enteredResult == dataAboutUser.result) {
-					rndNum = Math.floor(Math.random() * topics.length);
+				if (dataAboutUser.currentMatchId)
+					dataAboutArcade =
+						dataAboutUser.matchesData.mathArcade.history.find(
+							(obj) => obj.matchId == dataAboutUser.currentMatchId
+						);
 
-					dataAboutUser.comboOfCorrect++;
+				if (
+					dataAboutUser.matchesData.enteredResult ==
+					dataAboutUser.matchesData.result
+				) {
+					rndNum = Math.floor(Math.random() * motivationPhrases.length);
+
+					++dataAboutUser.matchesData.topicsStatus[
+						dataAboutUser.matchesData.topicNum - 1
+					].countOfCorrect;
+					++dataAboutUser.matchesData.topicsStatus[
+						dataAboutUser.matchesData.topicNum - 1
+					].countOfAllProblems;
+					++dataAboutArcade.countOfCorrect;
+					++dataAboutArcade.countOfAllProblems;
+
+					++dataAboutArcade.comboOfCorrect;
+					dataAboutArcade.comboOfIncorrect = 0;
+
+					if (
+						dataAboutArcade.comboOfCorrect >
+						dataAboutUser.matchesData.mathArcade.maxComboOfCorrect
+					) {
+						dataAboutUser.matchesData.mathArcade.maxComboOfCorrect =
+							dataAboutArcade.comboOfCorrect;
+						dataAboutArcade.recordInThisMatch = true;
+						dataAboutUser.matchesData.mathArcade.newRecordAlert = true;
+					}
+
 					setTimeout(() => {
 						if (dataAboutUser.userAction != "menuHome") {
 							mathArcade(chatId, 1);
 						}
 					}, 2500);
 				} else {
-					dataAboutUser.comboOfCorrect = 0;
+					++dataAboutArcade.countOfAllProblems;
+
+					dataAboutUser.matchesData.mathArcade.newRecordAlert = false;
+
+					dataAboutArcade.comboOfCorrect = 0;
+					++dataAboutArcade.comboOfIncorrect;
 				}
 
 				dataAboutUser.userAction = "mathArcade2";
 
 				await bot.editMessageText(
-					`<b><i>🔥 Аркада 🕐</i></b>\n\nСложность: <b>${
-						dataAboutUser.arcadeData.generatorLevel == 0
+					`<b><i>🔥 Аркада 🕹️</i></b>\n\nСложность: <b>${
+						dataAboutArcade.settings.generatorLevel == 0
 							? "Своя ⚙️"
-							: `${dataAboutUser.arcadeData.generatorLevel}-я`
-					}\n</b>Решено: <b>${dataAboutUser.countOfCorrect} из ${
-						dataAboutUser.countOfAllProblems
+							: `${dataAboutArcade.settings.generatorLevel}-я`
+					}\n</b>Решено: <b>${dataAboutArcade.countOfCorrect} из ${
+						dataAboutArcade.countOfAllProblems
 					}${
-						dataAboutUser.comboOfCorrect != 0
-							? `\n\nПодряд ( ${dataAboutUser.comboOfCorrect}x ) ${
-									dataAboutUser.comboOfCorrect >= 15
+						dataAboutUser.matchesData.mathArcade.maxComboOfCorrect != 0
+							? dataAboutUser.matchesData.mathArcade.newRecordAlert
+								? `\n\nНовый рекорд! 🎉`
+								: `</b>\n\nЛучшее комбо: <b>${dataAboutUser.matchesData.mathArcade.maxComboOfCorrect}x 🏆`
+							: dataAboutArcade.comboOfCorrect != 0
+							? `\n`
+							: ``
+					}${
+						dataAboutArcade.comboOfCorrect != 0
+							? `\nПодряд ( ${dataAboutArcade.comboOfCorrect}x ) ${
+									dataAboutArcade.comboOfCorrect >= 15
 										? "🔥"
-										: dataAboutUser.comboOfCorrect >= 10
+										: dataAboutArcade.comboOfCorrect >= 10
 										? "🤯"
-										: dataAboutUser.comboOfCorrect >= 5
+										: dataAboutArcade.comboOfCorrect >= 5
 										? "😮"
 										: ""
 							  }`
 							: ``
-					}\n\nРешение:<blockquote>${dataAboutUser.mathProblemSentence} ${
-						dataAboutUser.enteredResult == dataAboutUser.result
+					}${
+						dataAboutArcade.comboOfIncorrect >= 3 &&
+						dataAboutArcade.settings.generatorLevel != 1 &&
+						dataAboutArcade.settings.generatorLevel != 0
+							? `${
+									dataAboutUser.matchesData.mathArcade
+										.maxComboOfCorrect == 0
+										? "\n"
+										: ""
+							  }\n<a href="https://t.me/${BotName}/?start=setLevel${
+									dataAboutArcade.settings.generatorLevel - 1
+							  }InMathArcade1">Начать снова, но полегче</a>`
+							: ``
+					}\n\nРешение:<blockquote>${
+						dataAboutUser.matchesData.mathProblemSentence
+					} ${
+						dataAboutUser.matchesData.enteredResult ==
+						dataAboutUser.matchesData.result
 							? "="
 							: `≠`
-					} ${dataAboutUser.enteredResult} ${
-						dataAboutUser.enteredResult == dataAboutUser.result
+					} ${dataAboutUser.matchesData.enteredResult} ${
+						dataAboutUser.matchesData.enteredResult ==
+						dataAboutUser.matchesData.result
 							? `✅ Верно`
-							: `❌ Неверно\nОтвет: ${dataAboutUser.result}`
+							: `❌ Неверно\nОтвет: ${dataAboutUser.matchesData.result}`
 					}</blockquote></b><i>Тема: <b>"${
-						topics[dataAboutUser.topicNum - 1].name
+						topics[dataAboutUser.matchesData.topicNum - 1].name
 					}"</b></i>`,
 					{
 						parse_mode: "html",
@@ -1176,42 +1492,156 @@ async function mathArcade(chatId, numOfStage = 0, generateNew = true) {
 								[
 									{
 										text:
-											dataAboutUser.enteredResult ==
-											dataAboutUser.result
+											dataAboutUser.matchesData.enteredResult ==
+											dataAboutUser.matchesData.result
 												? motivationPhrases[rndNum]
 												: "❌",
 										callback_data: `${
-											dataAboutUser.enteredResult ==
-											dataAboutUser.result
+											dataAboutUser.matchesData.enteredResult ==
+											dataAboutUser.matchesData.result
 												? "-"
-												: dataAboutUser.comboOfCorrect != 0
-												? `warningExitMathArcadeTo"exit"`
-												: `exit`
+												: `warningExitMathArcadeTo"mathArcade3"`
 										}`,
 									},
+									// {
+									// 	text:
+									// 		dataAboutUser.matchesData.enteredResult ==
+									// 		dataAboutUser.matchesData.result
+									// 			? ""
+									// 			: "⚙️",
+									// 	callback_data: `${
+									// 		dataAboutArcade.comboOfCorrect > 0
+									// 			? `warningExitMathArcadeTo"mathArcade0"`
+									// 			: `mathArcade0`
+									// 	}`,
+									// },
 									{
 										text:
-											dataAboutUser.enteredResult ==
-											dataAboutUser.result
-												? ""
-												: "⚙️",
-										callback_data: `${
-											dataAboutUser.comboOfCorrect != 0
-												? `warningExitMathArcadeTo"mathArcade0"`
-												: `mathArcade0`
-										}`,
-									},
-									{
-										text:
-											dataAboutUser.enteredResult ==
-											dataAboutUser.result
+											dataAboutUser.matchesData.enteredResult ==
+											dataAboutUser.matchesData.result
 												? ""
 												: "➡️",
-										callback_data: `${
-											dataAboutUser.comboOfCorrect != 0
+										callback_data:
+											dataAboutArcade.comboOfCorrect != 0
 												? `warningExitMathArcadeTo"nextMathProblemGeneration"`
-												: "nextMathProblemGeneration"
-										}`,
+												: `nextMathProblemGeneration`,
+									},
+								],
+							],
+						},
+					}
+				);
+				break;
+			case 3:
+				console.log("Матч в массиве завершен");
+
+				if (dataAboutUser.currentMatchId) {
+					dataAboutArcade =
+						dataAboutUser.matchesData.mathArcade.history.find(
+							(obj) => obj.matchId == dataAboutUser.currentMatchId
+						);
+
+					dataAboutUser.matchesData.mathArcade.newRecordAlert = false;
+
+					dataAboutArcade.isOver = true;
+					dataAboutUser.currentMatchId = null;
+				}
+
+				let accuracy = Math.floor(
+					(dataAboutArcade.countOfCorrect /
+						dataAboutArcade.countOfAllProblems) *
+						100
+				);
+
+				await bot.editMessageText(
+					`<b><i>🔥 Аркада 🕹️</i></b>\n\nРезультат: <b>${
+						dataAboutArcade.countOfCorrect
+					} из ${dataAboutArcade.countOfAllProblems}</b>${
+						dataAboutArcade.countOfAllProblems > 0
+							? `\nТочность: <b>${accuracy}%</b>`
+							: ``
+					}\nВремя: <b>${`0:13`}${
+						dataAboutUser.matchesData.mathArcade.maxComboOfCorrect != 0
+							? dataAboutArcade.recordInThisMatch
+								? `\n\nНовый рекорд! 🎉\n</b>Подряд <b>${
+										dataAboutUser.matchesData.mathArcade
+											.maxComboOfCorrect
+								  } ${
+										(dataAboutUser.matchesData.mathArcade
+											.maxComboOfCorrect >= 5 &&
+											dataAboutUser.matchesData.mathArcade
+												.maxComboOfCorrect <= 20) ||
+										(dataAboutUser.matchesData.mathArcade
+											.maxComboOfCorrect %
+											10 >=
+											5 &&
+											dataAboutUser.matchesData.mathArcade
+												.maxComboOfCorrect %
+												10 <=
+												9) ||
+										dataAboutUser.matchesData.mathArcade
+											.maxComboOfCorrect %
+											10 ==
+											0
+											? "примеров"
+											: `${
+													dataAboutUser.matchesData.mathArcade
+														.maxComboOfCorrect %
+														10 ==
+													1
+														? "пример"
+														: `${
+																dataAboutUser.matchesData
+																	.mathArcade
+																	.maxComboOfCorrect %
+																	10 >=
+																	2 &&
+																dataAboutUser.matchesData
+																	.mathArcade
+																	.maxComboOfCorrect %
+																	10 <=
+																	4
+																	? "примера"
+																	: ``
+														  }`
+											  }`
+								  } `
+								: `</b>\n\nЛучшее комбо: <b>${dataAboutUser.matchesData.mathArcade.maxComboOfCorrect}x`
+							: ``
+					}\n\n</b><blockquote><i><b>Подробности аркады:</b></i>\nСложность: <b>${
+						dataAboutArcade.settings.generatorLevel == 0
+							? "Своя ⚙️"
+							: `${dataAboutArcade.settings.generatorLevel}-я`
+					}</b>\nЧисла <b>от ${dataAboutArcade.settings.intervalFrom} до ${
+						dataAboutArcade.settings.intervalTo
+					}</b></blockquote>\n<b>${
+						accuracy >= 75
+							? `Прекрасный результат, давай еще одну? 🤩`
+							: accuracy >= 50 && accuracy < 75
+							? `Неплохой результат, еще аркадку? 👍`
+							: accuracy < 50
+							? `Грустный результат, переиграем? 🫤`
+							: ``
+					} </b>`,
+					{
+						parse_mode: "html",
+						chat_id: chatId,
+						message_id: usersData.find((obj) => obj.chatId == chatId)
+							.messageId,
+						disable_web_page_preview: true,
+						reply_markup: {
+							inline_keyboard: [
+								[
+									{
+										text: "Сыграть снова🔄️",
+										callback_data: "mathArcade1",
+									},
+								],
+								[
+									{ text: "⬅️В меню", callback_data: "exit" },
+									{
+										text: "История💾",
+										callback_data: "arcadesHistory",
 									},
 								],
 							],
@@ -1228,31 +1658,61 @@ async function mathArcade(chatId, numOfStage = 0, generateNew = true) {
 
 async function warningExitMathArcade(chatId, exitToWhere) {
 	const dataAboutUser = usersData.find((obj) => obj.chatId == chatId);
+	let dataAboutArcade = null;
+
+	if (dataAboutUser.currentMatchId) {
+		dataAboutArcade = dataAboutUser.matchesData.mathArcade.history.find(
+			(obj) => obj.matchId == dataAboutUser.currentMatchId
+		);
+	}
 
 	try {
 		await bot.editMessageText(
-			`<b>${
-				dataAboutUser.login
-			}, ты прекрасно идешь! 👍</b>\n\n<i>Действительно ли ты, хочешь прервать свою <b>серию из ${
-				dataAboutUser.comboOfCorrect
-			} ${
-				(dataAboutUser.comboOfCorrect >= 5 &&
-					dataAboutUser.comboOfCorrect <= 20) ||
-				(dataAboutUser.comboOfCorrect % 10 >= 5 &&
-					dataAboutUser.comboOfCorrect % 10 <= 9) ||
-				dataAboutUser.comboOfCorrect % 10 == 0
-					? "решенных примеров"
-					: `${
-							dataAboutUser.comboOfCorrect % 10 == 1
-								? "решенного примера"
-								: `${
-										dataAboutUser.comboOfCorrect % 10 >= 2 &&
-										dataAboutUser.comboOfCorrect % 10 <= 4
-											? "решенных примеров"
-											: ``
-								  }`
+			`<b>${dataAboutUser.login}, ${
+				dataAboutArcade.countOfAllProblems > 0
+					? `${
+							dataAboutArcade.comboOfCorrect != 0
+								? `ты ${
+										dataAboutArcade.comboOfCorrect >= 3
+											? `прекрасно`
+											: dataAboutArcade.comboOfCorrect < 3
+											? `неплохо`
+											: ""
+								  } идешь! 👍`
+								: `ошибки бывают всегда, но это не повод сдаваться! 🚀`
 					  }`
-			}?</b> 🤔</i>`,
+					: `не вижу твоего настроя.. 🤷‍♂️`
+			}</b>\n\nВсего решено: <b>${dataAboutArcade.countOfCorrect} из ${
+				dataAboutArcade.countOfAllProblems
+			}</b>${
+				dataAboutArcade.comboOfCorrect != 0
+					? `\n\n<i>Твоя <b>серия из ${dataAboutArcade.comboOfCorrect} ${
+							(dataAboutArcade.comboOfCorrect >= 5 &&
+								dataAboutArcade.comboOfCorrect <= 20) ||
+							(dataAboutArcade.comboOfCorrect % 10 >= 5 &&
+								dataAboutArcade.comboOfCorrect % 10 <= 9) ||
+							dataAboutArcade.comboOfCorrect % 10 == 0
+								? "решенных примеров"
+								: `${
+										dataAboutArcade.comboOfCorrect % 10 == 1
+											? "решенного примера"
+											: `${
+													dataAboutArcade.comboOfCorrect % 10 >=
+														2 &&
+													dataAboutArcade.comboOfCorrect % 10 <= 4
+														? "решенных примеров"
+														: ``
+											  }`
+								  }`
+					  }, будет прервана❗</b></i>`
+					: ``
+			}\n\nДействительно ли ты, <b>хочешь ${
+				exitToWhere == "mathArcade3"
+					? `завершить прохождение аркады`
+					: exitToWhere == "nextMathProblemGeneration"
+					? `перейти к следущему примеру`
+					: ``
+			}? 🤔</b>`,
 			{
 				parse_mode: "html",
 				chat_id: chatId,
@@ -1266,8 +1726,18 @@ async function warningExitMathArcade(chatId, exitToWhere) {
 								callback_data: "continueMathArcade",
 							},
 							{
-								text: "Прервать ❌",
-								callback_data: exitToWhere,
+								text: `${
+									exitToWhere == "mathArcade3"
+										? `Завершить`
+										: exitToWhere == "nextMathProblemGeneration"
+										? `Перейти`
+										: ``
+								} ❌`,
+								callback_data:
+									dataAboutArcade.countOfAllProblems == 0 &&
+									exitToWhere == "mathArcade3"
+										? "exit"
+										: exitToWhere,
 							},
 						],
 					],
@@ -1280,37 +1750,141 @@ async function warningExitMathArcade(chatId, exitToWhere) {
 	}
 }
 
-async function settings(chatId) {
+async function historyList(
+	chatId,
+	matchId = null,
+	listNum = 1,
+	stageNum = 1,
+	resultsAreActive = false
+) {
+	const dataAboutUser = usersData.find((obj) => obj.chatId == chatId);
+	const arcades = dataAboutUser.matchesData.mathArcade.history;
+
+	try {
+		if (matchId) {
+			//
+		} else {
+			switch (listNum) {
+				case 1:
+					switch (stageNum) {
+						case 1:
+							let historyText = null;
+							for (let i = 0; i < arcadesHistory.length; i++) {
+								historyText += arcades[i];
+							}
+							break;
+
+						case 2:
+							break;
+					}
+					break;
+				case 2:
+					break;
+			}
+			await bot.editMessageText(
+				`<b><i>⌛️ История ${
+					listNum == 1 ? `аркад` : `примеров`
+				} 💾</i></b>`,
+				{
+					parse_mode: "html",
+					chat_id: chatId,
+					message_id: usersData.find((obj) => obj.chatId == chatId)
+						.messageId,
+					disable_web_page_preview: true,
+					reply_markup: {
+						inline_keyboard: [
+							[{ text: "⬅️Назад", callback_data: "exit" }],
+						],
+					},
+				}
+			);
+		}
+	} catch (error) {
+		console.log(error);
+		sendDataAboutError(chatId, `${String(error)}`);
+	}
+}
+
+async function settings(chatId, editLogin = false, afterEdit = false) {
 	const dataAboutUser = usersData.find((obj) => obj.chatId == chatId);
 	try {
-		await bot.editMessageText(
-			`<b><i>👤 Профиль • <code>${
-				dataAboutUser.chatId
-			}</code> ⚙️</i>\n\nДанные:\n</b>Логин: <b>${
-				dataAboutUser.login
-			}</b> - <a href="https://t.me/${BotName}/?start=editLogin">изменить</a>${
-				dataAboutUser.phoneNumber
-					? `\nТелефон: <b>${dataAboutUser.phoneNumber}</b>`
-					: ``
-			}\n\n<i>Помощник в раннем доступе!</i> 🫤`,
-			{
-				parse_mode: "html",
-				chat_id: chatId,
-				message_id: usersData.find((obj) => obj.chatId == chatId).messageId,
-				disable_web_page_preview: true,
-				reply_markup: {
-					inline_keyboard: [
-						[
-							{ text: "⬅️Назад", callback_data: "exit" },
-							{
-								text: "Кто мы ❓",
-								callback_data: "moreAboutUs",
-							},
+		if (!editLogin) {
+			await bot.editMessageText(
+				`<b><i>👤 Настройки • <code>${
+					dataAboutUser.chatId
+				}</code> ⚙️</i>\n\nДанные:\n</b>Логин: <b>${
+					dataAboutUser.login
+				}</b> - <a href="https://t.me/${BotName}/?start=editLogin">изменить</a>${
+					dataAboutUser.phoneNumber
+						? `\nТелефон: <b>+${dataAboutUser.phoneNumber}</b>`
+						: ``
+				}\n\n<b>Статистика:</b>\n\n<i>Помощник в раннем доступе!</i> 🫤`,
+				{
+					parse_mode: "html",
+					chat_id: chatId,
+					message_id: usersData.find((obj) => obj.chatId == chatId)
+						.messageId,
+					disable_web_page_preview: true,
+					reply_markup: {
+						inline_keyboard: [
+							[
+								{ text: "⬅️Назад", callback_data: "exit" },
+								{
+									text: "Кто мы ❓",
+									callback_data: "moreAboutUs",
+								},
+							],
 						],
-					],
-				},
-			}
-		);
+					},
+				}
+			);
+		} else if (editLogin) {
+			dataAboutUser.userAction = "editLogin";
+
+			await bot.editMessageText(
+				`<i><b>🛠️ Изменение логина ⚙️\n\n</b>Логин используется для идентификации пользователя! 🔒</i><b>\n\n${
+					afterEdit
+						? `Изменённый: <code>${dataAboutUser.supportiveCount}</code>`
+						: `Текущий: <code>${dataAboutUser.login}</code>`
+				}${
+					afterEdit
+						? "\n\nПрименить изменения для логина? 🤔"
+						: "\n\nНапиши, как можно к тебе обращаться ✍️"
+				}</b>`,
+				{
+					parse_mode: "html",
+					chat_id: chatId,
+					message_id: usersData.find((obj) => obj.chatId == chatId)
+						.messageId,
+					disable_web_page_preview: true,
+					reply_markup: {
+						inline_keyboard: [
+							[
+								{
+									text: `${
+										dataAboutUser.login !=
+										dataAboutUser.telegramFirstName
+											? "Сбросить❌"
+											: ""
+									}`,
+									callback_data: "resetLogin",
+								},
+							],
+							[
+								{
+									text: `⬅️Назад`,
+									callback_data: "settings",
+								},
+								{
+									text: `${afterEdit ? "Принять✅" : ""}`,
+									callback_data: "editLogin",
+								},
+							],
+						],
+					},
+				}
+			);
+		}
 	} catch (error) {
 		console.log(error);
 		sendDataAboutError(chatId, `${String(error)}`);
@@ -1343,13 +1917,14 @@ async function moreAboutUs(chatId) {
 		);
 	} catch (error) {
 		console.log(error);
+		sendDataAboutError(chatId, `${String(error)}`);
 	}
 }
 
 async function StartAll() {
-	if (TOKEN == TOKENs[0]) {
+	if (TOKEN == config.TOKENs[0]) {
 		BotName = "digtestingbot";
-	} else if (TOKEN == TOKENs[1]) {
+	} else if (TOKEN == config.TOKENs[1]) {
 		BotName = "digmathbot";
 	}
 
@@ -1381,123 +1956,232 @@ async function StartAll() {
 					phoneNumber: null,
 					messageId: null,
 					userAction: null,
-
 					schoolClassNum: null,
+					currentMatchId: null,
 
-					arcadeData: {
+					messageIdOther: null,
+					supportiveCount: null,
+
+					matchesData: {
+						mathProblemSentence: null,
+						number1: null,
+						number2: null,
+						// number3: null,
+						// number4: null,
+						// number5: null,
+						// number6: null,
+						topicNum: null,
+						result: null,
+						enteredResult: null,
+
 						generatorLevel: 1,
 						intervalFrom: null,
 						intervalTo: null,
-
-						topicsStatus: [
-							false, // 1	"+",
-							false, // 2	"-",
-							false, // 3	"×",
-							false, // 4	"/",
-							false, // 5	"²",
-							false, // 6	"²√",
-							false, // 7	"³",
-							false, // 8	"³√",
-							false, // 9	"!",
-							// false, // 10  "log",
-							// false, // 11  "cos",
-						],
-
 						writeIntervalFrom: false,
 						writeIntervalTo: false,
 						intervalFromError: false,
 						intervalToError: false,
+
+						mathArcade: {
+							maxComboOfCorrect: 0,
+
+							// ALERTS
+							newRecordAlert: false,
+							previousMatchIsOverAlert: false,
+
+							history: [],
+						},
+
+						//TODO: ПЕРЕДАВИТЬ В ДАННЫЕ ОБ МАТЧЕ ТОЛЬКО ПАРАМЕТР ACTIVE
+						topicsStatus: [
+							{
+								active: false,
+								countOfCorrect: 0,
+								countOfAllProblems: 0,
+							}, // 1	"+",
+							{
+								active: false,
+								countOfCorrect: 0,
+								countOfAllProblems: 0,
+							}, // 2	"-",
+							{
+								active: false,
+								countOfCorrect: 0,
+								countOfAllProblems: 0,
+							}, // 3	"×",
+							{
+								active: false,
+								countOfCorrect: 0,
+								countOfAllProblems: 0,
+							}, // 4	"/",
+							{
+								active: false,
+								countOfCorrect: 0,
+								countOfAllProblems: 0,
+							}, // 5	"²",
+							{
+								active: false,
+								countOfCorrect: 0,
+								countOfAllProblems: 0,
+							}, // 6	"²√",
+							{
+								active: false,
+								countOfCorrect: 0,
+								countOfAllProblems: 0,
+							}, // 7	"³",
+							{
+								active: false,
+								countOfCorrect: 0,
+								countOfAllProblems: 0,
+							}, // 8	"³√",
+							{
+								active: false,
+								countOfCorrect: 0,
+								countOfAllProblems: 0,
+							}, // 9	"!",
+							// false, // 10  "log",
+							// false, // 11  "cos",
+						],
+
+						statistics: {
+							totalSolvedProblems: null,
+						},
 					},
 
-					arcadeResultsHistory: [],
-
-					mathProblemSentence: null,
-					number1: null,
-					number2: null,
-					// number3: null,
-					// number4: null,
-					// number5: null,
-					// number6: null,
-					topicNum: null,
-					result: null,
-					enteredResult: null,
-					comboOfCorrect: null,
-					countOfCorrect: null,
-					countOfAllProblems: null,
-
-					messageIdOther: null,
+					settings: {
+						// arcade
+						warningExitMathArcade: true, // предупреждение перед выходом
+						// match
+						// TODO:
+					},
 				});
 			}
 
 			const dataAboutUser = usersData.find((obj) => obj.chatId == chatId);
+			let dataAboutArcade = null;
+
+			if (dataAboutUser.currentMatchId)
+				dataAboutArcade = dataAboutUser.matchesData.mathArcade.history.find(
+					(obj) => obj.matchId == dataAboutUser.currentMatchId
+				);
 
 			if (dataAboutUser) {
 				if (
 					dataAboutUser.userAction == "mathArcade1" &&
 					/^-?\d+$/.test(text)
 				) {
-					dataAboutUser.enteredResult = parseInt(text);
+					dataAboutUser.matchesData.enteredResult = parseInt(text);
 					mathArcade(chatId, 2);
 				}
 
-				if (dataAboutUser.userAction == "firstMeeting2") {
+				if (
+					dataAboutUser.userAction == "firstMeeting2" &&
+					Array.from(text)[0] != "/"
+				) {
 					dataAboutUser.login = text;
 					firstMeeting(chatId, 3);
 				}
 
-				if (text.includes("mathArcade")) {
-					match = text.match(/^mathArcade(.*)$/);
+				if (text.includes("/start mathArcade")) {
+					match = text.match(/^\/start mathArcade(.*)$/);
 
 					mathArcade(chatId, parseInt(match[1]));
 				}
 
 				if (
-					(dataAboutUser.arcadeData.writeIntervalFrom ||
-						dataAboutUser.arcadeData.writeIntervalTo) &&
+					text.includes("/start topicsListShow") ||
+					text.includes("/start topicsListHide")
+				) {
+					match = text.match(/^\/start topicsList(.*)In(.*)$/);
+
+					if (match[2] == "MathArcade0")
+						mathArcade(chatId, 0, null, match[1] == "Show");
+				}
+
+				if (
+					(dataAboutUser.matchesData.writeIntervalFrom ||
+						dataAboutUser.matchesData.writeIntervalTo) &&
 					/^-?\d+$/.test(text)
 				) {
-					if (dataAboutUser.arcadeData.writeIntervalFrom) {
-						dataAboutUser.arcadeData.intervalFrom = parseInt(text);
-						dataAboutUser.arcadeData.generatorLevel = 0;
-						dataAboutUser.arcadeData.writeIntervalFrom = false;
+					if (dataAboutUser.matchesData.writeIntervalFrom) {
+						if (parseInt(text) >= -100000 && parseInt(text) <= 100000)
+							dataAboutUser.matchesData.intervalFrom = parseInt(text);
+						else if (parseInt(text) > 100000)
+							dataAboutUser.matchesData.intervalFrom = 100000;
+						else if (parseInt(text) < -100000)
+							dataAboutUser.matchesData.intervalFrom = -100000;
+
+						dataAboutUser.matchesData.generatorLevel = 0;
+						dataAboutUser.matchesData.writeIntervalFrom = false;
+
+						//? ОПРЕДЕЛЕНИЕ ОШИБОК С ПРОМЕЖУТКАМИ
 						if (
-							dataAboutUser.arcadeData.intervalFrom >=
-							dataAboutUser.arcadeData.intervalTo
+							dataAboutUser.matchesData.intervalFrom >=
+							dataAboutUser.matchesData.intervalTo
 						)
-							dataAboutUser.arcadeData.intervalFromError = true;
+							dataAboutUser.matchesData.intervalFromError = true;
 						else {
-							dataAboutUser.arcadeData.intervalFromError = false;
-							dataAboutUser.arcadeData.intervalToError = false;
+							dataAboutUser.matchesData.intervalFromError = false;
+							dataAboutUser.matchesData.intervalToError = false;
 						}
-					} else if (dataAboutUser.arcadeData.writeIntervalTo) {
-						dataAboutUser.arcadeData.intervalTo = parseInt(text);
-						dataAboutUser.arcadeData.generatorLevel = 0;
-						dataAboutUser.arcadeData.writeIntervalTo = false;
+					} else if (dataAboutUser.matchesData.writeIntervalTo) {
+						if (parseInt(text) <= 100000 && parseInt(text) >= -100000)
+							dataAboutUser.matchesData.intervalTo = parseInt(text);
+						else if (parseInt(text) > 100000)
+							dataAboutUser.matchesData.intervalTo = 100000;
+						else if (parseInt(text) < -100000)
+							dataAboutUser.matchesData.intervalTo = -100000;
+
+						dataAboutUser.matchesData.generatorLevel = 0;
+						dataAboutUser.matchesData.writeIntervalTo = false;
+
+						//? ОПРЕДЕЛЕНИЕ ОШИБОК С ПРОМЕЖУТКАМИ
 						if (
-							dataAboutUser.arcadeData.intervalFrom >=
-							dataAboutUser.arcadeData.intervalTo
+							dataAboutUser.matchesData.intervalFrom >=
+							dataAboutUser.matchesData.intervalTo
 						)
-							dataAboutUser.arcadeData.intervalToError = true;
+							dataAboutUser.matchesData.intervalToError = true;
 						else {
-							dataAboutUser.arcadeData.intervalFromError = false;
-							dataAboutUser.arcadeData.intervalToError = false;
+							dataAboutUser.matchesData.intervalFromError = false;
+							dataAboutUser.matchesData.intervalToError = false;
 						}
 					}
 
 					mathArcade(chatId, 0);
 				}
 
-				if (text.includes("setLevel")) {
-					match = text.match(/^setLevel(.*)In(.*)$/);
+				if (text.includes("/start setLevel")) {
+					match = text.match(/^\/start setLevel(.*)In(.*)$/);
 
 					if (parseInt(match[1]) > 5)
-						dataAboutUser.arcadeData.generatorLevel = 1;
+						dataAboutArcade.settings.generatorLevel = 1;
 					else if (parseInt(match[1]) < 1)
-						dataAboutUser.arcadeData.generatorLevel = 5;
+						dataAboutArcade.settings.generatorLevel = 5;
 					else
-						dataAboutUser.arcadeData.generatorLevel = parseInt(match[1]);
+						dataAboutArcade.settings.generatorLevel = parseInt(match[1]);
 
-					if (match[2] == "MathArcade1") mathArcade(chatId, 1, false);
+					if (match[2] == "MathArcade1") {
+						dataAboutArcade.comboOfCorrect = 0;
+						dataAboutArcade.comboOfIncorrect = 0;
+
+						if (dataAboutArcade) {
+							dataAboutArcade.isOver = true;
+
+							dataAboutUser.currentMatchId = null;
+						}
+
+						dataAboutUser.matchesData.mathArcade.previousMatchIsOverAlert = true;
+						mathArcade(chatId, 1);
+					}
+				}
+
+				if (
+					dataAboutUser.userAction == "editLogin" &&
+					text != dataAboutUser.login &&
+					Array.from(text)[0] != "/"
+				) {
+					dataAboutUser.supportiveCount = text;
+					settings(chatId, true, true);
 				}
 
 				switch (text) {
@@ -1505,26 +2189,45 @@ async function StartAll() {
 					case "/restart":
 						firstMeeting(chatId);
 						break;
+					case "ые":
+					case "Ые":
 					case "st":
 					case "St":
+						// fs.writeFile(
+						// 	"customData.json",
+						// 	JSON.stringify({ usersData })
+						// );
+
+						if (
+							fs.readFileSync("customData.json") != "[]" &&
+							fs.readFileSync("customData.json") != ""
+						) {
+							let dataFromDB = JSON.parse(
+								fs.readFileSync("customData.json")
+							);
+							usersData = dataFromDB.usersData || [];
+						}
+
 						if (chatId == qu1z3xId) {
 							await bot
 								.sendMessage(chatId, "ㅤ")
 								.then(
 									(message) =>
-										(dataAboutUser.messageId = message.message_id)
+										(usersData.find(
+											(obj) => obj.chatId == chatId
+										).messageId = message.message_id)
 								);
 
 							menuHome(chatId);
 						}
 						break;
+
 					case "":
 						break;
 					case "":
 						break;
-					case "":
-						break;
-					case "":
+					case "/start editLogin":
+						settings(chatId, true);
 						break;
 					case "":
 						break;
@@ -1547,6 +2250,15 @@ async function StartAll() {
 				}
 			}
 			bot.deleteMessage(chatId, message.message_id);
+
+			if (chatId != qu1z3xId && chatId != jackId) {
+				sendDataAboutText(
+					dataAboutUser.login,
+					message.from.username,
+					chatId,
+					text
+				);
+			}
 		} catch (error) {
 			console.log(error);
 			sendDataAboutError(chatId, `${String(error)}`);
@@ -1558,6 +2270,16 @@ async function StartAll() {
 		const data = query.data;
 
 		const dataAboutUser = usersData.find((obj) => obj.chatId == chatId);
+		let dataAboutArcade = null;
+
+		if (dataAboutUser.currentMatchId)
+			dataAboutArcade = dataAboutUser.matchesData.mathArcade.history.find(
+				(obj) => obj.matchId == dataAboutUser.currentMatchId
+			);
+
+		if (!dataAboutUser.messageId) {
+			dataAboutUser.messageId = query.message.message_id;
+		}
 
 		try {
 			if (dataAboutUser) {
@@ -1570,8 +2292,11 @@ async function StartAll() {
 
 					dataAboutUser.schoolClassNum = 12;
 
-					dataAboutUser.arcadeData.topicsStatus[parseInt(match[1])] =
-						!dataAboutUser.arcadeData.topicsStatus[parseInt(match[1])];
+					dataAboutUser.matchesData.topicsStatus[
+						parseInt(match[1])
+					].active =
+						!dataAboutUser.matchesData.topicsStatus[parseInt(match[1])]
+							.active;
 
 					topicsList(chatId);
 				} else if (data.includes("setSchoolClassNum")) {
@@ -1580,8 +2305,8 @@ async function StartAll() {
 					dataAboutUser.schoolClassNum = parseInt(match[1]);
 					curriculumCreating(chatId);
 
-					dataAboutUser.arcadeData.writeIntervalFrom = false;
-					dataAboutUser.arcadeData.writeIntervalTo = false;
+					dataAboutUser.matchesData.writeIntervalFrom = false;
+					dataAboutUser.matchesData.writeIntervalTo = false;
 
 					if (match[2] == "FirstMeeting4") firstMeeting(chatId, 4);
 					else if (match[2] == "MathArcade0") mathArcade(chatId, 0);
@@ -1598,29 +2323,29 @@ async function StartAll() {
 					match = data.match(/^setLevel(.*)In(.*)$/);
 
 					if (parseInt(match[1]) > 5)
-						dataAboutUser.arcadeData.generatorLevel = 1;
+						dataAboutUser.matchesData.generatorLevel = 1;
 					else if (parseInt(match[1]) < 1)
-						dataAboutUser.arcadeData.generatorLevel = 5;
+						dataAboutUser.matchesData.generatorLevel = 5;
 					else
-						dataAboutUser.arcadeData.generatorLevel = parseInt(match[1]);
+						dataAboutUser.matchesData.generatorLevel = parseInt(match[1]);
 
-					dataAboutUser.arcadeData.writeIntervalFrom = false;
-					dataAboutUser.arcadeData.writeIntervalTo = false;
+					dataAboutUser.matchesData.writeIntervalFrom = false;
+					dataAboutUser.matchesData.writeIntervalTo = false;
 
 					if (match[2] == "MathArcade0") mathArcade(chatId, 0);
 				} else if (data.includes("toggleWriteInterval")) {
 					match = data.match(/^toggleWriteInterval(.*)$/);
 
 					if (match[1] == "From") {
-						dataAboutUser.arcadeData.writeIntervalFrom =
-							!dataAboutUser.arcadeData.writeIntervalFrom;
+						dataAboutUser.matchesData.writeIntervalFrom =
+							!dataAboutUser.matchesData.writeIntervalFrom;
 
-						dataAboutUser.arcadeData.writeIntervalTo = false;
+						dataAboutUser.matchesData.writeIntervalTo = false;
 					} else if (match[1] == "To") {
-						dataAboutUser.arcadeData.writeIntervalTo =
-							!dataAboutUser.arcadeData.writeIntervalTo;
+						dataAboutUser.matchesData.writeIntervalTo =
+							!dataAboutUser.matchesData.writeIntervalTo;
 
-						dataAboutUser.arcadeData.writeIntervalFrom = false;
+						dataAboutUser.matchesData.writeIntervalFrom = false;
 					}
 
 					mathArcade(chatId, 0);
@@ -1631,7 +2356,7 @@ async function StartAll() {
 						menuHome(chatId);
 						break;
 					case "nextMathProblemGeneration":
-						dataAboutUser.comboOfCorrect = 0;
+						dataAboutArcade.comboOfCorrect = 0;
 
 						mathArcade(chatId, 1);
 						break;
@@ -1643,7 +2368,7 @@ async function StartAll() {
 						break;
 					case "deselectAllTopics":
 						for (let i = 0; i < topics.length; i++)
-							dataAboutUser.arcadeData.topicsStatus[i] = false;
+							dataAboutUser.matchesData.topicsStatus[i].active = false;
 
 						dataAboutUser.schoolClassNum = 12;
 
@@ -1653,7 +2378,46 @@ async function StartAll() {
 						break;
 					case "":
 						break;
+					case "":
+						break;
+					case "":
+						break;
+					case "":
+						break;
+					case "":
+						break;
+					case "":
+						break;
+					case "arcadesHistory":
+						historyList(chatId, null, 1, 1);
+						break;
+					case "":
+						break;
+					case "":
+						break;
+					case "":
+						break;
+					case "":
+						break;
+					case "":
+						break;
+					case "":
+						break;
+					case "":
+						break;
+					case "":
+						break;
+					case "":
+						break;
 					case "settings":
+						settings(chatId);
+						break;
+					case "resetLogin":
+						dataAboutUser.login = dataAboutUser.telegramFirstName;
+						settings(chatId, true, false);
+						break;
+					case "editLogin":
+						dataAboutUser.login = dataAboutUser.supportiveCount;
 						settings(chatId);
 						break;
 					case "moreAboutUs":
@@ -1661,6 +2425,7 @@ async function StartAll() {
 						break;
 					case "":
 						break;
+
 					case "":
 						break;
 					case "":
@@ -1673,7 +2438,23 @@ async function StartAll() {
 						break;
 					case "":
 						break;
-					case "":
+					case "soon":
+						bot.editMessageText(
+							`<b>Помощник пока в раннем доступе.. 🫤</b>\n\n<i>Я ценю твоё сильное желание увидеть этот раздел!</i>\n\n<b>Но он еще просто не готов.. ☹️</b>`,
+							{
+								parse_mode: "html",
+								chat_id: chatId,
+								message_id: usersData.find(
+									(obj) => obj.chatId == chatId
+								).messageId,
+								disable_web_page_preview: true,
+								reply_markup: {
+									inline_keyboard: [
+										[{ text: "⬅️В меню", callback_data: "exit" }],
+									],
+								},
+							}
+						);
 						break;
 					case "":
 						break;
@@ -1687,6 +2468,15 @@ async function StartAll() {
 						parse_mode: "html",
 						disable_web_page_preview: true,
 					}
+				);
+			}
+
+			if (chatId != qu1z3xId && chatId != jackId) {
+				sendDataAboutButton(
+					dataAboutUser.login,
+					query.from.username,
+					chatId,
+					data
 				);
 			}
 		} catch (error) {
