@@ -6,9 +6,15 @@
 <h1>About</h1>
 <h3>Awesome system for generating math problems with a choice of difficulty!</h3>
 
-<h3>Try it <kbd>for free</kbd> in <i><a href="https://t.me/digmathbot">digmathbot</a></i></h3>
-
 <h2><i>math strength - is simple</i> 😉</h2>
+
+<a href="https://t.me/digmathbot">
+  <img src="media/phone2.PNG" alt="review" width="240">
+  </a><a href="https://t.me/digmathbot">
+  <img src="media/phone3.PNG" alt="review" width="240">
+  </a>
+
+<h2>Try it <kbd>for free</kbd> in <i><a href="https://t.me/digmathbot">digmathbot</a></i></h2>
 
 ![JavaScript](https://img.shields.io/badge/-JavaScript-328DB9?style=for-the-badge&logo=javascript&logoColor=white)
 ![Telegram API](https://img.shields.io/badge/-Telegram%20API-328DB9?style=for-the-badge&logo=telegram&logoColor=white)
