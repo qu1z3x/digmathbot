@@ -9,9 +9,9 @@
 <h2><i>math strength - is simple</i> 😉</h2>
 
 <a href="https://t.me/digmathbot">
-  <img src="media/phone2.PNG" alt="review" width="240">
+  <img src="media/phone2.png" alt="review" width="240">
   </a><a href="https://t.me/digmathbot">
-  <img src="media/phone3.PNG" alt="review" width="240">
+  <img src="media/phone3.png" alt="review" width="240">
   </a>
 
 <h2>Try it <kbd>for free</kbd> in <i><a href="https://t.me/digmathbot">digmathbot</a></i></h2>
