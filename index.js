@@ -816,7 +816,7 @@ async function numbersGenerator(chatId) {
 
 			count++;
 
-			if (count >= 5000) {
+			if (count >= 10000) {
 				count2++;
 				count = 0; // Сброс счётчика попыток
 
@@ -1566,16 +1566,16 @@ async function mathArcade(
 													: "nextMathProblemGeneration1",
 										},
 									],
-									[
-										{
-											text: "Решение 🤓",
-											callback_data:
-												dataAboutArcade.comboOfCorrect !=
-												0
-													? `warningExitMathArcadeTo"nextMathProblemGeneration1"`
-													: "nextMathProblemGeneration1",
-										},
-									],
+									// [
+									// 	{
+									// 		text: "Решить с ИИ ✨",
+									// 		callback_data:
+									// 			dataAboutArcade.comboOfCorrect !=
+									// 			0
+									// 				? `warningExitMathArcadeTo"nextMathProblemGeneration1"`
+									// 				: "nextMathProblemGeneration1",
+									// 	},
+									// ],
 								],
 							},
 						}
@@ -2573,34 +2573,20 @@ async function StartAll() {
 				}
 
 				switch (text) {
-					case "/start":
-						await bot
-							.sendMessage(chatId, "ㅤ")
-							.then(
-								(message) =>
-									(dataAboutUser.messageId =
-										message.message_id)
-							);
-
-						firstMeeting(chatId);
-						break;
 					case "/restart":
-						await bot
-							.sendMessage(chatId, "ㅤ")
-							.then(
-								(message) =>
-									(dataAboutUser.messageId =
-										message.message_id)
-							);
+					case "/start":
+						try {
+							bot.deleteMessage(chatId, dataAboutUser.messageId);
+						} catch (error) {}
 
-						if (
-							chatId == jackId ||
-							chatId == qu1z3xId ||
-							dataAboutUser.registrationIsOver
-						) {
+						await bot.sendMessage(chatId, "ㅤ").then((message) => {
+							dataAboutUser.messageId = message.message_id;
+						});
+
+						if (text == "/restart") {
 							menuHome(chatId);
-						} else if (!dataAboutUser.registrationIsOver) {
-							firstMeeting(chatId);
+						} else {
+							firstMeeting(chatId, 1);
 						}
 						break;
 					case "":
